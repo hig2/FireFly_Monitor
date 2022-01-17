@@ -1,9 +1,7 @@
 
 import com.fazecast.jSerialComm.SerialPort;
-
 import java.io.*;
 import java.util.*;
-
 
 /*
  * Класс описывает базовую работу и удобный протокол переачи массивов по последовательному порту
@@ -23,33 +21,36 @@ import java.util.*;
  */
 
 public class SerialBoomerang {
-    private static final int[] BAUD_RATE_LIST = {9600, 19200, 38400, 57600, 74880, 115200};
-    private short[] resultArray;
+    private final static int[] BAUD_RATE_LIST = {9600, 19200, 38400, 57600, 74880, 115200};
+    private final static Set<SerialPort> openPortList = new HashSet<>();
+    private short[] inArray;
+    private short[] outArray;
     private final SerialPort serialPort;
     private String openPortName;
     private int openPortBaudRate;
 
-    private SerialBoomerang(String openPortName, int baudRate, short[] resultArray) {
+    private SerialBoomerang(String openPortName, int baudRate, short[] inArray, short[] outArray) {
         this.openPortName = openPortName;
         serialPort = SerialPort.getCommPort(openPortName);
         serialPort.openPort();
         serialPort.setBaudRate(baudRate);
         openPortBaudRate = baudRate;
-        this.resultArray = resultArray;
+        this.inArray = inArray;
+        this.outArray = outArray;
+        openPortList.add(serialPort);
         System.out.println("Open serial port: " + openPortName);
     }
 
-    public static SerialBoomerang getConnectSerialPort(String portName, int baudRate, short[] resultArray) throws Exception {
+    public static SerialBoomerang getConnectSerialPort(String portName, int baudRate, short[] inArray, short[] outArray){
         if (portName == null) {
             return null;
         }
         portName = portName.toUpperCase();
-        String[] serialPortList = getArrayAllSerialPortsName();
 
-        if (Arrays.binarySearch(serialPortList, portName) >= 0) {
-            return new SerialBoomerang(portName, baudRate, resultArray);
+        if (Arrays.binarySearch(getArrayAllSerialPortsName(), portName) >= 0) {
+            return new SerialBoomerang(portName, baudRate, inArray, outArray);
         }
-        throw new Exception("Non-existing serial port name!");
+        return null;
     }
 
     public static int[] getBaudRateList() {
@@ -72,7 +73,7 @@ public class SerialBoomerang {
     }
 
     public final short[] getResultArray() {
-        return resultArray;
+        return inArray;
     }
 
     public final boolean isOpened() {
@@ -91,14 +92,7 @@ public class SerialBoomerang {
         return "Port is " + (serialPort.isOpen() ? getOpenPortName() + "open, baud rate: " + getOpenPortBaudRate() : "clos.");
     }
 
-    public final InputStream getInStream() {
-        if (serialPort.isOpen()) {
-            return serialPort.getInputStream();
-        }
-        return null;
-    }
-
-    public final void test() {
+    private final void slaveTask() {
         if(serialPort == null){
             return;
         }
@@ -108,8 +102,10 @@ public class SerialBoomerang {
                 while (serialPort.bytesAvailable() > 0) {
                     byte[] readBuffer = new byte[serialPort.bytesAvailable()];
                     int numRead = serialPort.readBytes(readBuffer, readBuffer.length);
-                    resultArray = parseFrame(readBuffer, numRead);
-                    System.out.println(Arrays.toString(resultArray));
+                    inArray = parseFrame(readBuffer, numRead);
+                    //System.out.println(Arrays.toString(resultArray));
+
+                    //serialPort.writeBytes();
 
                 }
             }
@@ -124,9 +120,8 @@ public class SerialBoomerang {
         byte startSymbol = (byte) '$';
         byte separatorSymbol = (byte) ' ';
         byte finishSymbol = (byte) ';';
-        short[] bufferArray = new short[resultArray.length];
+        short[] bufferArray = new short[inArray.length];
         boolean startReadFlag = false;
-        //short acc = 0;
 
         //ищем стартовый символ
         for (int i = 0, factor = 0, indexOfBufferArray = 0, acc = 0; i < quantityOfRealByte; i++) {
@@ -156,7 +151,7 @@ public class SerialBoomerang {
                     }else{
                         System.out.println(crc);
                         // была ошибка crc
-                        return resultArray;
+                        return inArray;
                     }
                 } else {
                     //проверка на соотв числовому значению
@@ -165,40 +160,40 @@ public class SerialBoomerang {
                         factor = 10;
                     } else {
                         // была ошибка валидности пакета
-                        return resultArray;
+                        return inArray;
                     }
                 }
             }
         }
         // не удалось найти валидную сигнатуру, возвращаем прежний массив
-        return resultArray;
+        return inArray;
     }
 
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
 
-        short[] result = new short[5];
+        short[] inArray = new short[5];
+        short[] outArray = new short[3];
         Scanner scanner = new Scanner(System.in);
         SerialBoomerang connect = null;
 
         while(connect == null){
+
             String[] serialPortList = getArrayAllSerialPortsName();
 
             System.out.println(Arrays.toString(serialPortList));
 
+            while(!scanner.hasNextLine())
+                Thread.sleep(100);
 
             String scannerResult = scanner.nextLine().toUpperCase();
 
+            connect = getConnectSerialPort(scannerResult, getBaudRateList()[0], inArray, outArray);
 
-            try{
-                connect = getConnectSerialPort(scannerResult, getBaudRateList()[0], result);
-            }catch(Exception e){
-                e.printStackTrace();
-            }
         }
 
 
-        connect.test();
+        connect.slaveTask();
 
 
     }
