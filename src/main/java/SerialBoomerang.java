@@ -2,6 +2,9 @@
 import com.fazecast.jSerialComm.SerialPort;
 import java.io.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /*
  * Класс описывает базовую работу и удобный протокол переачи массивов по последовательному порту
@@ -92,27 +95,45 @@ public class SerialBoomerang {
         return "Port is " + (serialPort.isOpen() ? getOpenPortName() + "open, baud rate: " + getOpenPortBaudRate() : "clos.");
     }
 
-    private final void slaveTask() {
+    private final void slaveTask() throws IOException {
         if(serialPort == null){
             return;
         }
+
         try {
             while (true) {
                 Thread.sleep(20);
                 while (serialPort.bytesAvailable() > 0) {
                     byte[] readBuffer = new byte[serialPort.bytesAvailable()];
                     int numRead = serialPort.readBytes(readBuffer, readBuffer.length);
-                    inArray = parseFrame(readBuffer, numRead);
-                    //System.out.println(Arrays.toString(resultArray));
+                    //inArray = parseFrame(readBuffer, numRead);
+                    char[] result = new char[numRead];
+                    for(int i = 0; i < result.length; i++){
+                        result[i] = (char) readBuffer[i];
+                    }
 
-                    //serialPort.writeBytes();
+                    System.out.println(Arrays.toString(result) + " Len: " + result.length);
+                    Pattern pattern = Pattern.compile("\\$([\\d]{1,5})\\s([\\d]{1,5})\\s([\\d]{1,5})\\s([\\d]{1,5})\\s([\\d]{1,5});");
+                    Matcher matcher = pattern.matcher(Arrays.toString(result));
+
+                    while(matcher.find()){
+                       System.out.println(matcher.group());
+                    }
+
+
+
+
+
+
+
 
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        close();
+
+
     }
 
 
