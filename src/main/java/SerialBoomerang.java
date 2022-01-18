@@ -1,5 +1,6 @@
 
 import com.fazecast.jSerialComm.SerialPort;
+
 import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -44,7 +45,7 @@ public class SerialBoomerang {
         System.out.println("Open serial port: " + openPortName);
     }
 
-    public static SerialBoomerang getConnectSerialPort(String portName, int baudRate, short[] inArray, short[] outArray){
+    public static SerialBoomerang getConnectSerialPort(String portName, int baudRate, short[] inArray, short[] outArray) {
         if (portName == null) {
             return null;
         }
@@ -95,10 +96,16 @@ public class SerialBoomerang {
         return "Port is " + (serialPort.isOpen() ? getOpenPortName() + "open, baud rate: " + getOpenPortBaudRate() : "clos.");
     }
 
-    private final void slaveTask() throws IOException {
-        if(serialPort == null){
-            return;
-        }
+    private void slaveTask() throws IOException {
+
+        byte startSymbol = (byte) '$';
+        byte finishSymbol = (byte) ';';
+
+        byte[] globalBuffer = new byte[inArray.length * 5];
+        int indexGlobalBuffer = 0;
+        boolean startReadFlag = false;
+        int realByte = 0;
+
 
         try {
             while (true) {
@@ -106,34 +113,85 @@ public class SerialBoomerang {
                 while (serialPort.bytesAvailable() > 0) {
                     byte[] readBuffer = new byte[serialPort.bytesAvailable()];
                     int numRead = serialPort.readBytes(readBuffer, readBuffer.length);
-                    //inArray = parseFrame(readBuffer, numRead);
-                    char[] result = new char[numRead];
-                    for(int i = 0; i < result.length; i++){
-                        result[i] = (char) readBuffer[i];
+
+                    for (int i = 0; i < numRead; i++) {
+                        if (readBuffer[i] == startSymbol) {
+                            indexGlobalBuffer = 0;
+                            startReadFlag = true;
+                            realByte = 0;
+                            i++;
+                        } else if (readBuffer[i] == finishSymbol) {
+                            indexGlobalBuffer = 0;
+                            startReadFlag = false;
+                            //обновляем глобальное состояние
+                            inArray = inArrayUpload(globalBuffer, realByte);
+                            System.out.println(Arrays.toString(inArray));
+                            realByte = 0;
+
+                        }
+
+                        if (startReadFlag) {
+                            if (indexGlobalBuffer == globalBuffer.length) {
+                                startReadFlag = false;
+                                indexGlobalBuffer = 0;
+                                System.out.println("Buffer is over!!");
+                            }
+                            globalBuffer[indexGlobalBuffer++] = readBuffer[i];
+                            realByte++;
+                        }
                     }
-
-                    System.out.println(Arrays.toString(result) + " Len: " + result.length);
-                    Pattern pattern = Pattern.compile("\\$([\\d]{1,5})\\s([\\d]{1,5})\\s([\\d]{1,5})\\s([\\d]{1,5})\\s([\\d]{1,5});");
-                    Matcher matcher = pattern.matcher(Arrays.toString(result));
-
-                    while(matcher.find()){
-                       System.out.println(matcher.group());
-                    }
-
-
-
-
-
-
-
-
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
 
 
+    private short[] inArrayUpload(byte[] newInArray, int realByte) {
+        byte separatorSymbol = (byte) ' ';
+        short[] bufferArray = new short[inArray.length];
+
+        //realByte + 1 обрабатываем тем самым последнюю итерацию acc
+        for (int i = 0, acc = 0, factor = 0, indexOfBufferArray = 0; i < realByte + 1; i++) {
+            if (i == realByte) {
+                bufferArray[indexOfBufferArray] = (short) acc;
+                break;
+            }
+
+            if (newInArray[i] == separatorSymbol) {
+                bufferArray[indexOfBufferArray] = (short) acc;
+                indexOfBufferArray++;
+                if (indexOfBufferArray == (bufferArray.length)) {
+                    // пришедший пакет больше ожидаемого
+                    return inArray;
+                }
+                acc = 0;
+                factor = 0;
+            } else if ((newInArray[i] - 48) >= 0 && (newInArray[i] - 48) <= 9) {
+                acc = ((acc * factor) + (newInArray[i] - 48));
+                factor = 10;
+            } else {
+                // была ошибка валидности пакета
+                return inArray;
+            }
+
+        }
+
+        // начало проверки контрольной суммы
+        short crc = 0;
+
+        for (int n = 0; n < bufferArray.length - 1; n++) {
+            crc += bufferArray[n];
+        }
+
+        if (bufferArray[bufferArray.length - 1] == crc) {
+            //все ок
+            return bufferArray;
+        } else {
+            // была ошибка crc
+            return inArray;
+        }
     }
 
 
@@ -154,22 +212,25 @@ public class SerialBoomerang {
 
             if (startReadFlag) {
                 if (frame[i] == separatorSymbol) {
-                    bufferArray[indexOfBufferArray] = (short)acc;
+                    bufferArray[indexOfBufferArray] = (short) acc;
                     indexOfBufferArray++;
+                    if (indexOfBufferArray == (bufferArray.length)) {
+                        return inArray;
+                    }
                     acc = 0;
                     factor = 0;
-                }else if (frame[i] == finishSymbol) {
-                    bufferArray[indexOfBufferArray] = (short)acc;
+                } else if (frame[i] == finishSymbol) {
+                    bufferArray[indexOfBufferArray] = (short) acc;
 
                     //проверка CRC
                     short crc = 0;
-                    for(int n = 0; n < bufferArray.length - 1; n++){
+                    for (int n = 0; n < bufferArray.length - 1; n++) {
                         crc += bufferArray[n];
                     }
 
-                    if(bufferArray[bufferArray.length - 1] == crc){
+                    if (bufferArray[bufferArray.length - 1] == crc) {
                         return bufferArray;
-                    }else{
+                    } else {
                         System.out.println(crc);
                         // была ошибка crc
                         return inArray;
@@ -198,13 +259,13 @@ public class SerialBoomerang {
         Scanner scanner = new Scanner(System.in);
         SerialBoomerang connect = null;
 
-        while(connect == null){
+        while (connect == null) {
 
             String[] serialPortList = getArrayAllSerialPortsName();
 
             System.out.println(Arrays.toString(serialPortList));
 
-            while(!scanner.hasNextLine())
+            while (!scanner.hasNextLine())
                 Thread.sleep(100);
 
             String scannerResult = scanner.nextLine().toUpperCase();
@@ -213,10 +274,8 @@ public class SerialBoomerang {
 
         }
 
-
         connect.slaveTask();
-
-
+        connect.close();
     }
 }
 
