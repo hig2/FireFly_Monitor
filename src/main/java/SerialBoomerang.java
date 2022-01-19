@@ -7,6 +7,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+//qweqweqweeeeeeeee$1 2 3 4 10;qweqwerqwerqwerqwerqwerqwerqwerqwerqwertqtwetetwtewqqqqqqqqqteqwtwe
+
 /*
  * Класс описывает базовую работу и удобный протокол переачи массивов по последовательному порту
  * Массив является типом short (особенность совместимости с системами где int 2 байта и хранит числа от -32 768 до 32 767)
@@ -113,13 +115,12 @@ public class SerialBoomerang {
                 while (serialPort.bytesAvailable() > 0) {
                     byte[] readBuffer = new byte[serialPort.bytesAvailable()];
                     int numRead = serialPort.readBytes(readBuffer, readBuffer.length);
-
                     for (int i = 0; i < numRead; i++) {
                         if (readBuffer[i] == startSymbol) {
                             indexGlobalBuffer = 0;
                             startReadFlag = true;
                             realByte = 0;
-                            i++;
+                            continue;
                         } else if (readBuffer[i] == finishSymbol) {
                             indexGlobalBuffer = 0;
                             startReadFlag = false;
@@ -127,17 +128,12 @@ public class SerialBoomerang {
                             inArray = inArrayUpload(globalBuffer, realByte);
                             System.out.println(Arrays.toString(inArray));
                             realByte = 0;
-
                         }
 
                         if (startReadFlag) {
-                            if (indexGlobalBuffer == globalBuffer.length) {
-                                startReadFlag = false;
-                                indexGlobalBuffer = 0;
-                                System.out.println("Buffer is over!!");
-                            }
                             globalBuffer[indexGlobalBuffer++] = readBuffer[i];
                             realByte++;
+
                         }
                     }
                 }
@@ -194,62 +190,6 @@ public class SerialBoomerang {
         }
     }
 
-
-    private short[] parseFrame(byte[] frame, int quantityOfRealByte) {
-        byte startSymbol = (byte) '$';
-        byte separatorSymbol = (byte) ' ';
-        byte finishSymbol = (byte) ';';
-        short[] bufferArray = new short[inArray.length];
-        boolean startReadFlag = false;
-
-        //ищем стартовый символ
-        for (int i = 0, factor = 0, indexOfBufferArray = 0, acc = 0; i < quantityOfRealByte; i++) {
-            if (frame[i] == startSymbol) {
-                startReadFlag = true;
-                i++; // переводим на следующий индекс
-            }
-
-
-            if (startReadFlag) {
-                if (frame[i] == separatorSymbol) {
-                    bufferArray[indexOfBufferArray] = (short) acc;
-                    indexOfBufferArray++;
-                    if (indexOfBufferArray == (bufferArray.length)) {
-                        return inArray;
-                    }
-                    acc = 0;
-                    factor = 0;
-                } else if (frame[i] == finishSymbol) {
-                    bufferArray[indexOfBufferArray] = (short) acc;
-
-                    //проверка CRC
-                    short crc = 0;
-                    for (int n = 0; n < bufferArray.length - 1; n++) {
-                        crc += bufferArray[n];
-                    }
-
-                    if (bufferArray[bufferArray.length - 1] == crc) {
-                        return bufferArray;
-                    } else {
-                        System.out.println(crc);
-                        // была ошибка crc
-                        return inArray;
-                    }
-                } else {
-                    //проверка на соотв числовому значению
-                    if ((frame[i] - 48) >= 0 && (frame[i] - 48) <= 9) {
-                        acc = ((acc * factor) + (frame[i] - 48));
-                        factor = 10;
-                    } else {
-                        // была ошибка валидности пакета
-                        return inArray;
-                    }
-                }
-            }
-        }
-        // не удалось найти валидную сигнатуру, возвращаем прежний массив
-        return inArray;
-    }
 
 
     public static void main(String[] args) throws IOException, InterruptedException {
