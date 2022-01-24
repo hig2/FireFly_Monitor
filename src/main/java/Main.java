@@ -17,9 +17,10 @@ public class Main {
             while (!scanner.hasNextLine())
                 Thread.sleep(100);
             scannerResult = scanner.nextLine().toUpperCase();
-        } while ((connect = SerialBoomerang.getConnectSerialPort(scannerResult, SerialBoomerang.getBaudRateList()[0], inArray, outArray, true, 3500)) == null);
+        } while ((connect = SerialBoomerang.getConnectSerialPort(scannerResult, SerialBoomerang.getBaudRateList()[0], inArray, outArray, true, 1000)) == null);
+        Thread.sleep(2000);
+        //connect.tested();
 
-        //Thread.sleep(10000);
 
        // connect.close();
 

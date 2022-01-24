@@ -73,6 +73,17 @@ public class SerialBoomerang {
         return null;
     }
 
+    void tested(){
+        serialPort.clearDTR();
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        serialPort.getDTR();
+        System.out.println("Сброс!");
+    }
+
 
     public static int[] getBaudRateList() {
         return BAUD_RATE_LIST;
@@ -171,7 +182,7 @@ public class SerialBoomerang {
         }
 
         for(int i = 0; i < outArray.length; i++){
-            result = i == (outArray.length - 1) ? result + crc + finishSymbol : result + outArray[i] + separatorSymbol;
+            result = i == (outArray.length - 1) ? result + crc + finishSymbol + '\n' : result + outArray[i] + separatorSymbol;
         }
 
             //System.out.println(serialPort.setComPortParameters(9600, 8, 1, 1));
