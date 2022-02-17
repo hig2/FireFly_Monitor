@@ -41,6 +41,10 @@ public class SerialBoomerang {
     private boolean startReadFlag = false;
     private int realByte = 0;
 
+    private final char startSymbol = '$';
+    private final char finishSymbol = ';';
+    private final char separatorSymbol = ' ';
+
 
     private SerialBoomerang(String openPortName, int baudRate, short[] inArray, short[] outArray) {
         this.openPortName = openPortName;
@@ -169,9 +173,6 @@ public class SerialBoomerang {
 
 
     private void writeSerial() {
-        char startSymbol = '$';
-        char finishSymbol = ';';
-        char separatorSymbol = ' ';
         short crc = 0;
         String result = String.valueOf(startSymbol);
 
@@ -188,13 +189,11 @@ public class SerialBoomerang {
     }
 
     private boolean readSerial() throws IOException {
-        byte startSymbol = (byte) '$';
-        byte finishSymbol = (byte) ';';
-
 
         while (serialPort.bytesAvailable() > 0) {
             byte[] readBuffer = new byte[serialPort.bytesAvailable()];
             int numRead = serialPort.readBytes(readBuffer, readBuffer.length);
+
             for (int i = 0; i < numRead; i++) {
                 if (readBuffer[i] == startSymbol) {
                     indexGlobalBuffer = 0;
@@ -229,7 +228,6 @@ public class SerialBoomerang {
 
 
     private short[] inArrayUpload(byte[] newInArray, int realByte) {
-        byte separatorSymbol = (byte) ' ';
         short[] bufferArray = new short[inArray.length];
 
         //realByte + 1 обрабатываем тем самым последнюю итерацию acc
