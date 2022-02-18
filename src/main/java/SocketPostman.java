@@ -172,18 +172,22 @@ public class SocketPostman {
         short[] outArray = new short[3];
         SocketPostman socketPostman = new SocketPostman(args[0], Integer.parseInt(args[1]), inArray, outArray);
 
-        do {
-            Thread.sleep(1000);
-            System.out.println(Arrays.toString(inArray));
-            System.out.println(socketPostman.isDataExchange());
-            System.out.println("________________________________________________");
-            System.out.println("Состояние: ");
-            System.out.println("Температура топлива: ");
-            System.out.println("Ошибка: ");
 
+         while (socketPostman.isConnected()){
+             Thread.sleep(1000);
+             if(socketPostman.isDataExchange()){ // проверка на наличие обмена
+                 System.out.println("________________________________________________");
+                 System.out.println("Состояние: " + inArray[0]);
+                 System.out.println("Температура : " + inArray[1]);
+                 System.out.println("Ошибка: " + inArray[7]);
+             }else{
+                 System.out.println("________________________________________________");
+                 System.out.println("Состояние: " + inArray[0]);
+                 System.out.println("Температура : " + inArray[1]);
+                 System.out.println("Ошибка: " + inArray[7]);
+             }
 
-
-        } while (socketPostman.isConnected());
+         }
 
         System.out.println("произошел разрыв соединения!");
 
