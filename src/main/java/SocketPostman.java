@@ -45,11 +45,8 @@ public class SocketPostman {
             while (connectStatus) {
                 try {
                     Thread.sleep(20);
-                    if (in.available() > 0) {
                         int numByte = in.read(buffer);
                         parseBuffer(buffer, numByte);
-                    }
-                    client.getOutputStream().write(0); // проверка на подключение к серверу
                 } catch (Exception e) {
                     e.printStackTrace();
                     connectStatus = false;
