@@ -4,6 +4,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class SocketPostman {
     static private Socket client;
@@ -11,6 +12,8 @@ public class SocketPostman {
     private short[] outArray;
 
     private boolean connectStatus = false;
+    private boolean dataExchange = false;
+
 
     private final char startSymbol = '$';
     private final char finishSymbol = ';';
@@ -35,33 +38,56 @@ public class SocketPostman {
     public final boolean isConnected() {
         return connectStatus;
     }
+    public final  boolean isDataExchange(){
+        return dataExchange;
+    }
 
 
     public void clientTask() throws IOException {
         byte[] buffer = new byte[globalBuffer.length];
         DataInputStream in = new DataInputStream(client.getInputStream());
+        AtomicLong t = new AtomicLong(0);
+        int delay = 5000;
 
         Thread thread = new Thread(() -> {
             while (connectStatus) {
                 try {
                     Thread.sleep(20);
+                        t.set(System.currentTimeMillis());
                         int numByte = in.read(buffer);
-                        parseBuffer(buffer, numByte);
+                    if(parseBuffer(buffer, numByte)){
+                        dataExchange = true;
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     connectStatus = false;
+                    dataExchange = false;
+                }
+            }
+        });
+
+        Thread timerWatcher = new Thread(() -> {
+            while (connectStatus) {
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                if((System.currentTimeMillis() - t.get()) > delay){
+                    dataExchange = false;
                 }
             }
         });
 
         thread.start();
+        timerWatcher.start();
     }
 
     public Socket getClient() {
         return client;
     }
 
-    private void parseBuffer(byte[] buffer, int numByte) throws IOException {
+    private boolean parseBuffer(byte[] buffer, int numByte) throws IOException {
 
         for (int i = 0; i < numByte; i++) {
             if (buffer[i] == startSymbol) {
@@ -75,20 +101,20 @@ public class SocketPostman {
                 realByte = 0;
                 startReadFlag = false;
                 indexGlobalBuffer = 0;
-                return;
+                return true;
             }
             if (startReadFlag) {
                 if (indexGlobalBuffer == globalBuffer.length) {
                     realByte = 0;
                     startReadFlag = false;
                     indexGlobalBuffer = 0;
-                    return;
+                    return false;
                 }
                 globalBuffer[indexGlobalBuffer++] = buffer[i];
                 realByte++;
             }
         }
-
+    return false;
     }
 
 
@@ -142,15 +168,24 @@ public class SocketPostman {
 
 
     public static void main(String[] args) throws IOException, InterruptedException {
-
         short[] inArray = new short[15];
         short[] outArray = new short[3];
         SocketPostman socketPostman = new SocketPostman(args[0], Integer.parseInt(args[1]), inArray, outArray);
-        while (socketPostman.isConnected()) {
-            Thread.sleep(400);
+
+        do {
+            Thread.sleep(1000);
             System.out.println(Arrays.toString(inArray));
-            //System.out.println(socketPostman.getClient());
-        }
+            System.out.println(socketPostman.isDataExchange());
+            System.out.println("________________________________________________");
+            System.out.println("Состояние: ");
+            System.out.println("Температура топлива: ");
+            System.out.println("Ошибка: ");
+
+
+
+        } while (socketPostman.isConnected());
+
         System.out.println("произошел разрыв соединения!");
+
     }
 }
